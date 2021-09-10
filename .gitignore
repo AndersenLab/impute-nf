@@ -1,0 +1,4 @@
+impute-*
+.nextflow*
+pipeline-info/*
+2021*
