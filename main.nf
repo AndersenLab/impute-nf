@@ -2,12 +2,13 @@
 /*
     Authors:
     - Katie Evans <kathrynevans2015@u.northwestern.edu>
+    - Mike Sauria <mike.sauria@jhu.edu>
 */
 
-nextflow.preview.dsl=2
+nextflow.enable.dsl=2
 date = new Date().format( 'yyyyMMdd' )
 
-contigs = Channel.from("I","II","III","IV","V","X")
+contigs = Channel.of("I","II","III","IV","V","X")
 params.cores = 4
 
 // imputation parameters
@@ -30,6 +31,8 @@ if(params.debug) {
     """
     params.vcf = "${workflow.projectDir}/test_data/WI.20201230.hard-filter.vcf.gz"
     params.out = "impute-${date}-debug"
+    params.species = "c_elegans"
+
 } else {
     params.out = "impute-${date}"
 
@@ -46,17 +49,25 @@ def log_summary() {
 
 out = '''
 
------------------
---- IMPUTE-NF ---
------------------
-
+        ##########                     #                    ##
+            ##                       #####                 #  #
+            ##                         #                   #
+            ##    # ## ##  ###  #   #  #   ##       # ##  ####
+            ##     #  #  # #  # #   #  #  #  #  ###  #  #  #
+            ##     #  #  # #  # #   #  #  ###        #  #  #
+            ##     #  #  # #  # #   #  #  #          #  #  #
+        ########## #  #  # ###   ###   #   ###       #  #  #
+                           #
+                           #
+                           #
+                           
 Subset isotype reference strains from hard-filter vcf, create SNV-only VCF and impute VCF.
 
 ''' + """
 
-nextflow main.nf --debug=true
+nextflow -latest andersenlab/impute-nf --debug
 
-nextflow main.nf --vcf=hard-filtered.vcf --sample_sheet=sample_sheet.tsv --species=c_elegans 
+nextflow -latest andersenlab/impute-nf --vcf=hard-filtered.vcf --sample_sheet=sample_sheet.tsv --species=c_elegans 
 
     parameters                 description                                              Set/Default
     ==========                 ===========                                              ========================
@@ -70,7 +81,7 @@ nextflow main.nf --vcf=hard-filtered.vcf --sample_sheet=sample_sheet.tsv --speci
  
     username                                                                      ${"whoami".execute().in.text}
 
-    HELP: http://andersenlab.org/dry-guide/pipeline-postGATK   
+    HELP: http://andersenlab.org/dry-guide/pipelines/pipeline-impute/   
     ----------------------------------------------------------------------------------------------
     Git info: $workflow.repository - $workflow.revision [$workflow.commitId] 
 """
@@ -112,8 +123,6 @@ workflow {
 
 process subset_snv {
 
-    conda "/projects/b1059/software/conda_envs/popgen-nf_env"
-
     publishDir "${params.out}/variation", mode: 'copy'
 
     input:
@@ -126,10 +135,8 @@ process subset_snv {
     bcftools view -O u ${hardvcf} | \
     bcftools view -O v --types snps --min-af 0.000001 --max-af 0.999999 | \
     vcffixup - | \
-    bcftools view --threads=3 -O z > WI.${date}.hard-filter.isotype.SNV.vcf.gz
-    
+    bcftools view --threads=${task.cpus} -O z > WI.${date}.hard-filter.isotype.SNV.vcf.gz  
     bcftools index --tbi WI.${date}.hard-filter.isotype.SNV.vcf.gz
-
     """
 
 }
@@ -140,12 +147,7 @@ process imputation {
     //errorStrategy 'ignore'
 
     tag {CHROM} 
-    cpus params.cores 
-    // memory { 25.GB + 10.GB * task.attempt }
-    memory '35 GB'
-
-
-    conda "/projects/b1059/software/conda_envs/beagle"
+    label "ml"
 
     input:
         tuple val(CHROM), file(hardvcf), file(hardvcf_index)
@@ -181,7 +183,7 @@ process imputation {
         ov=`echo "${params.chrX}" | cut -d ',' -f 2`
     fi
 
-    beagle -Xmx98g chrom=${CHROM} window=\$win overlap=\$ov impute=true ne=100000 nthreads=1 imp-segment=0.5 imp-step=0.01 cluster=0.0005 gt=${hardvcf} map=${workflow.projectDir}/bin/${params.species}/chr${CHROM}.map out=${CHROM}.b5
+    beagle chrom=${CHROM} window=\$win overlap=\$ov impute=true ne=100000 nthreads=${task.cpus} imp-segment=0.5 imp-step=0.01 cluster=0.0005 gt=${hardvcf} map=${workflow.projectDir}/bin/${params.species}/chr${CHROM}.map out=${CHROM}.b5
 
     bcftools index ${CHROM}.b5.vcf.gz
 
@@ -196,10 +198,7 @@ process concat_imputed {
 
     publishDir "${params.out}/variation/", mode: 'copy'
 
-    conda "/projects/b1059/software/conda_envs/popgen-nf_env"
-
-    memory '64 GB'
-    cpus 20
+    label "ml"
 
     input:
         file("*")
