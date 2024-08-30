@@ -32,11 +32,11 @@ This page details how to run the pipeline.
 
 ## Software Requirements
 
-* The latest update requires Nextflow version 23+. On Rockfish, you can access this version by loading the `nf23_env` conda environment prior to running the pipeline command:
+* The latest update requires Nextflow version 24+. On Rockfish, you can access this version by loading the `nf24_env` conda environment prior to running the pipeline command:
 
 ```
 module load python/anaconda
-source activate /data/eande106/software/conda_envs/nf23_env
+source activate /data/eande106/software/conda_envs/nf24_env
 ```
 
 ### Relevant Docker Images
@@ -44,13 +44,6 @@ source activate /data/eande106/software/conda_envs/nf23_env
 *Note: Before 20220301, this pipeline was run using existing conda environments on QUEST. However, these have since been migrated to docker imgaes to allow for better control and reproducibility across platforms. If you need to access the conda version, you can always run an old commit with `nextflow run andersenlab/post-gatk-nf -r 20220216-Release`*
 
 * `andersenlab/beagle` ([link](https://hub.docker.com/r/andersenlab/beagle)): Docker image is created within this pipeline using GitHub actions. Whenever a change is made to `env/beagle.Dockerfile` or `.github/workflows/build_beagle_docker.yml` GitHub actions will create a new docker image and push if successful
-
-Make sure that you add the following code to your `~/.bash_profile`. This line makes sure that any singularity images you download will go to a shared location on `/vast/eande106` for other users to take advantage of (without them also having to download the same image).
-
-```
-# add singularity cache
-export SINGULARITY_CACHEDIR='/vast/eande106/singularity/'
-```
 
 >[!Note]
 >If you need to work with the docker container, you will need to create an interactive session as singularity can't be run on Rockfish login nodes.
